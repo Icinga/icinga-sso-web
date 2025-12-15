@@ -100,6 +100,16 @@ class OidcController extends CompatController
             }
         }
 
+        $session->set('session', (object) [
+            'mtime'  => time(),
+            'tokens' => $tokens
+        ]);
+
+        $session->set('provider', (object) [
+            'config'     => $login->config,
+            'discovered' => $login->discovered
+        ]);
+
         $user = (new User($username))->setGroups($groups ?? []);
 
         $this->Auth()->setAuthenticated($user);

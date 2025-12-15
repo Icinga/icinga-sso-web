@@ -6,3 +6,7 @@
 use Icinga\Module\Sso\ProvidedHook\ButtonHook;
 
 ButtonHook::register();
+
+/** @var $this \Icinga\Application\Modules\Module */
+
+$this->provideHook('authentication', alwaysRun: true);
