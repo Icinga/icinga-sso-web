@@ -66,8 +66,7 @@ class ProviderForm extends CompatForm
             'description' => $this->translate(
                 'Must point to this Icinga Web instance and match your OAuth application configuration'
             ),
-            // TODO: actual URL of the implementation
-            'value'       => Url::fromPath('sso/todo')->getAbsoluteUrl(),
+            'value'       => Url::fromPath('sso/oidc/redirection-endpoint')->getAbsoluteUrl(),
             'class'       => 'resolve-absolute-url',
             'required'    => true
         ]);
