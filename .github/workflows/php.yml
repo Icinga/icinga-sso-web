@@ -1,0 +1,14 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - support/*
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  php:
+    name: PHP
+    uses: Icinga/github-actions/.github/workflows/php.yml@main
