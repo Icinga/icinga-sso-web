@@ -1,0 +1,6 @@
+Module: sso
+Version: 1.0.0
+Requires:
+  Libraries: icinga-php-library (>=0.19.0), icinga-php-thirdparty (>=0.15.0)
+Description: Icinga Web SSO
+ Adds OpenID Connect (OIDC) single sign-on to Icinga Web
