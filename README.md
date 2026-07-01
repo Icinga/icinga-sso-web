@@ -6,7 +6,7 @@ Users are authenticated against the chosen provider and logged in to Icinga Web.
 
 ## Documentation
 
-Icinga Web SSO documentation is available at [icinga.com/docs](https://icinga.com/docs/icinga-sso-web/latest/).
+Icinga Web SSO documentation is available at [icinga.com/docs](https://icinga.com/docs/icinga-sso/latest/).
 
 ## Features
 
