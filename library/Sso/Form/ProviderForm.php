@@ -31,8 +31,8 @@ class ProviderForm extends CompatForm
         ]);
 
         $this->addElement('text', 'base_url', [
-            'label'       => $this->translate('Base URL'),
-            'description' => $this->translate('The OpenID Provider URL'),
+            'label'       => $this->translate('Discovery URL'),
+            'description' => $this->translate('Must end with /.well-known/openid-configuration'),
             'placeholder' => 'https://example.com/.well-known/openid-configuration',
             'required'    => true,
             'class'       => 'autosubmit',
