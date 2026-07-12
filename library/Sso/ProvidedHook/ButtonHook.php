@@ -22,11 +22,18 @@ class ButtonHook extends LoginButtonHook
 {
     use Translation;
 
+    /** @var string Session key used to prevent auto-redirect loops (e.g. after a failed IdP login) */
+    private const AUTO_REDIRECT_GUARD = 'auto_redirect_attempted';
+
     public function getButtons(): array
     {
+        $providers = Config::module('sso', 'providers');
+
+        $this->maybeAutoRedirect($providers);
+
         $buttons = [];
 
-        foreach (Config::module('sso', 'providers') as $id => $section) {
+        foreach ($providers as $id => $section) {
             $buttons[$id] = new LoginButton(
                 function () use ($section): void {
                     $this->login($section);
@@ -36,6 +43,44 @@ class ButtonHook extends LoginButtonHook
         }
 
         return $buttons;
+    }
+
+    /**
+     * Redirect straight to the sole configured provider if it is set up for automatic redirection
+     *
+     * Only triggers for plain GET requests to avoid interfering with form submissions, and refuses to
+     * redirect again within the same session once it already tried once, to avoid bouncing the user back
+     * and forth if the provider itself sends them back to the login page (e.g. on error). Appending
+     * ?ssoSkip=1 to the login URL always shows the normal login form instead, e.g. to reach a local
+     * fallback account while the provider is unreachable.
+     */
+    protected function maybeAutoRedirect(iterable $providers): void
+    {
+        $request = Icinga::app()->getRequest();
+
+        if ($request->getMethod() !== 'GET' || $request->getUrl()->getParam('ssoSkip')) {
+            return;
+        }
+
+        $sole = null;
+        $count = 0;
+        foreach ($providers as $section) {
+            $count++;
+            $sole = $section;
+        }
+
+        if ($count !== 1 || $sole->get('auto_redirect') !== 'y') {
+            return;
+        }
+
+        $guard = Session::getSession()->getNamespace('sso');
+        if ($guard->get(self::AUTO_REDIRECT_GUARD)) {
+            return;
+        }
+
+        $guard->set(self::AUTO_REDIRECT_GUARD, true);
+
+        $this->login($sole);
     }
 
     protected function login(ConfigObject $config): void

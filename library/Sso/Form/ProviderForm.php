@@ -92,6 +92,17 @@ class ProviderForm extends CompatForm
             'required'    => $this->getPopulatedValue('map_groups', 'y') === 'y'
         ]);
 
+        $this->addElement('checkbox', 'auto_redirect', [
+            'label'       => $this->translate('Automatic Redirect'),
+            'description' => $this->translate(
+                'Skip the login page and redirect directly to this provider. Only takes effect if this is the'
+                . ' only configured provider. Append ?ssoSkip=1 to the login URL to bypass this and reach the'
+                . ' normal login form, e.g. to use a local fallback account if the provider is unreachable.'
+            ),
+            'value'       => 'n',
+            'class'       => 'autosubmit'
+        ]);
+
         $advanced = new FieldsetElement('advanced_settings');
         $advanced->setLabel($this->translate('Advanced Settings'));
         $this->addElement($advanced);
