@@ -90,6 +90,10 @@ class OidcController extends CompatController
             ));
         }
 
+        if (is_string($groups)) {
+            $groups = array_filter(array_map('trim', explode(',', $groups)));
+        }
+
         if ($groups !== null) {
             $groupnameSearch = $login->config->groupname_search ?? '';
 
