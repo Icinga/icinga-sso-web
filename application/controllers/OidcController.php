@@ -14,6 +14,7 @@ use Icinga\Util\Json;
 use Icinga\Web\Form\Element\LoginRedirect;
 use Icinga\Web\Session;
 use ipl\Web\Compat\CompatController;
+use ipl\Stdlib\Str;
 
 class OidcController extends CompatController
 {
@@ -95,7 +96,7 @@ class OidcController extends CompatController
         }
 
         if (is_string($groups)) {
-            $groups = array_filter(array_map('trim', explode(',', $groups)));
+            $groups = array_filter(Str::trimSplit($groups));
         }
 
         if ($groups !== null) {
