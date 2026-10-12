@@ -35,16 +35,22 @@ class Authentication extends AuthenticationHook
         }
 
         try {
+            $tokens = Json::decode(
+                (new Client())->post($provider->discovered->token_endpoint, ['form_params' => [
+                    'grant_type'    => 'refresh_token',
+                    'refresh_token' => $session->tokens->refresh_token,
+                    'client_id'     => $provider->config->client_id,
+                    'client_secret' => $provider->config->client_secret
+                ]])->getBody()->getContents()
+            );
+
+            // The server MAY omit the refresh token if it did not rotate it. In that case, keep using the old one.
+            // https://datatracker.ietf.org/doc/html/rfc6749#section-6
+            $tokens->refresh_token ??= $session->tokens->refresh_token;
+
             $nsp->set('session', (object) [
                 'mtime'  => time(),
-                'tokens' => Json::decode(
-                    (new Client())->post($provider->discovered->token_endpoint, ['form_params' => [
-                        'grant_type'    => 'refresh_token',
-                        'refresh_token' => $session->tokens->refresh_token,
-                        'client_id'     => $provider->config->client_id,
-                        'client_secret' => $provider->config->client_secret
-                    ]])->getBody()->getContents()
-                )
+                'tokens' => $tokens
             ]);
         } catch (Throwable $e) {
             Auth::getInstance()->removeAuthorization();

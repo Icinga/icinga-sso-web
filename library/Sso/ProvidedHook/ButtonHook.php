@@ -49,6 +49,7 @@ class ButtonHook extends LoginButtonHook
         Session::getSession()->getNamespace('oidc')->set('login', (object) [
             'ctime'      => time(),
             'state'      => $state,
+            'redirect'   => Url::fromRequest()->getParam('redirect'),
             'config'     => (object) $config->toArray(),
             'discovered' => $openidCfg
         ]);
