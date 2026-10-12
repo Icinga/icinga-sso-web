@@ -11,6 +11,7 @@ use Icinga\Exception\AuthenticationException;
 use Icinga\Security\SecurityException;
 use Icinga\User;
 use Icinga\Util\Json;
+use Icinga\Web\Form\Element\LoginRedirect;
 use Icinga\Web\Session;
 use ipl\Web\Compat\CompatController;
 
@@ -29,6 +30,9 @@ class OidcController extends CompatController
         if ($login?->ctime < time() - 3600 || ! hash_equals($login->state, $state)) {
             throw new SecurityException($this->translate('Invalid or expired state'));
         }
+
+        // Resolved up front, so a rejected target costs no token exchange.
+        $redirectUrl = (new LoginRedirect('redirect'))->setValue($login->redirect ?? null)->getUrl();
 
         $client = new Client();
 
@@ -115,6 +119,6 @@ class OidcController extends CompatController
         $this->Auth()->setAuthenticated($user);
         $session->delete('login');
         AuthenticationHook::triggerLogin($user);
-        $this->redirectNow('dashboard');
+        $this->redirectNow($redirectUrl);
     }
 }
