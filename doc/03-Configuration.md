@@ -28,6 +28,8 @@ and are managed through the Icinga Web frontend.
 Claims are first read from the ID token. If a required claim is absent there, Icinga Web SSO
 automatically falls back to the provider's userinfo endpoint.
 
+A providers group\_claim can be an array or a comma seperated list. 
+
 ### Advanced Settings
 
 | Field              | Description                                                   | Example             |
