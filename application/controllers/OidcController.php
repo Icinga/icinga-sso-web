@@ -176,7 +176,8 @@ class OidcController extends CompatController
                 );
             }
 
-            throw new AuthenticationException(sprintf($message, $name));
+            // 502 for the failed upstream. Unlike with 500, the error page doesn't log it again.
+            throw new HttpException(502, sprintf($message, $name));
         }
 
         try {
@@ -184,7 +185,7 @@ class OidcController extends CompatController
         } catch (JsonDecodeException $e) {
             Logger::error('OIDC %s response is no valid JSON: %s', $name, $e);
 
-            throw new AuthenticationException(sprintf(
+            throw new HttpException(502, sprintf(
                 $this->translate('Authorization server sent an invalid %s response. Check the provider configuration.'),
                 $name
             ));
