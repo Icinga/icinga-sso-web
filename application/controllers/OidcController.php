@@ -6,7 +6,9 @@
 namespace Icinga\Module\Sso\Controllers;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Icinga\Application\Hook\AuthenticationHook;
+use Icinga\Application\Logger;
 use Icinga\Exception\AuthenticationException;
 use Icinga\Security\SecurityException;
 use Icinga\User;
@@ -51,13 +53,22 @@ class OidcController extends CompatController
 
         $client = new Client();
 
-        $tokens = Json::decode($client->post($login->discovered->token_endpoint, ['form_params' => [
-            'grant_type'    => 'authorization_code',
-            'code'          => $code,
-            'client_id'     => $login->config->client_id,
-            'client_secret' => $login->config->client_secret,
-            'redirect_uri'  => $login->config->redirect_url
-        ]])->getBody()->getContents());
+        try {
+            $tokens = Json::decode($client->post($login->discovered->token_endpoint, ['form_params' => [
+                'grant_type'    => 'authorization_code',
+                'code'          => $code,
+                'client_id'     => $login->config->client_id,
+                'client_secret' => $login->config->client_secret,
+                'redirect_uri'  => $login->config->redirect_url
+            ]])->getBody()->getContents());
+        } catch (GuzzleException $e) {
+            // Not chained as previous: the error page shows previous messages, which may contain the server response.
+            Logger::error('OIDC token request failed: %s', $e);
+
+            throw new AuthenticationException($this->translate(
+                'Authorization server rejected the token request. Check the provider configuration.'
+            ));
+        }
 
         // "the TLS server validation MAY be used to validate the issuer in place of checking the token signature"
         // -- https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
