@@ -11,6 +11,7 @@ use Icinga\Application\Hook\AuthenticationHook;
 use Icinga\Application\Logger;
 use Icinga\Exception\AuthenticationException;
 use Icinga\Exception\Http\HttpException;
+use Icinga\Exception\Json\JsonDecodeException;
 use Icinga\Security\SecurityException;
 use Icinga\User;
 use Icinga\Util\Json;
@@ -159,13 +160,24 @@ class OidcController extends CompatController
     private function requestJson(string $name, callable $request): mixed
     {
         try {
-            return Json::decode($request()->getBody()->getContents());
+            $response = $request();
         } catch (GuzzleException $e) {
             // Not chained as previous: the error page shows previous messages, which may contain the server response.
             Logger::error('OIDC %s request failed: %s', $name, $e);
 
             throw new AuthenticationException(sprintf(
                 $this->translate('Authorization server rejected the %s request. Check the provider configuration.'),
+                $name
+            ));
+        }
+
+        try {
+            return Json::decode($response->getBody()->getContents());
+        } catch (JsonDecodeException $e) {
+            Logger::error('OIDC %s response is no valid JSON: %s', $name, $e);
+
+            throw new AuthenticationException(sprintf(
+                $this->translate('Authorization server sent an invalid %s response. Check the provider configuration.'),
                 $name
             ));
         }
