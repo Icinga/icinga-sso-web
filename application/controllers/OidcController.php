@@ -23,7 +23,6 @@ class OidcController extends CompatController
     public function redirectionEndpointAction(): void
     {
         $state = $this->params->getRequired('state');
-        $code = $this->params->getRequired('code');
 
         $session = Session::getSession()->getNamespace('oidc');
         $login = $session->get('login');
@@ -31,6 +30,21 @@ class OidcController extends CompatController
         if ($login?->ctime < time() - 3600 || ! hash_equals($login->state, $state)) {
             throw new SecurityException($this->translate('Invalid or expired state'));
         }
+
+        // Checked after the state, so only the provider of this login can make us display a message.
+        // https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1
+        $error = $this->params->get('error');
+
+        if ($error !== null) {
+            $description = $this->params->get('error_description');
+
+            throw new AuthenticationException(sprintf(
+                $this->translate('Authorization server rejected the login: %s'),
+                $description === null ? $error : "$error ($description)"
+            ));
+        }
+
+        $code = $this->params->getRequired('code');
 
         // Resolved up front, so a rejected target costs no token exchange.
         $redirectUrl = (new LoginRedirect('redirect'))->setValue($login->redirect ?? null)->getUrl();
