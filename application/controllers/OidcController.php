@@ -10,6 +10,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use Icinga\Application\Hook\AuthenticationHook;
 use Icinga\Application\Logger;
 use Icinga\Exception\AuthenticationException;
+use Icinga\Exception\Http\HttpException;
 use Icinga\Security\SecurityException;
 use Icinga\User;
 use Icinga\Util\Json;
@@ -43,10 +44,17 @@ class OidcController extends CompatController
         if ($error !== null) {
             $details = array_filter([$this->params->get('error_description'), $this->params->get('error_uri')]);
 
-            throw new AuthenticationException(sprintf(
+            $message = sprintf(
                 $this->translate('Authorization server rejected the login: %s'),
                 empty($details) ? $error : $error . ' (' . implode(', ', $details) . ')'
-            ));
+            );
+
+            if ($error === 'access_denied') {
+                // E.g. the user declined consent. That's no server fault to answer with 500 and log as error.
+                throw new HttpException(403, $message);
+            }
+
+            throw new AuthenticationException($message);
         }
 
         $code = $this->params->getRequired('code');
