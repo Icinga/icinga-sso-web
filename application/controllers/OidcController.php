@@ -6,8 +6,13 @@
 namespace Icinga\Module\Sso\Controllers;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\BadResponseException;
+use GuzzleHttp\Exception\GuzzleException;
 use Icinga\Application\Hook\AuthenticationHook;
+use Icinga\Application\Logger;
 use Icinga\Exception\AuthenticationException;
+use Icinga\Exception\Http\HttpException;
+use Icinga\Exception\Json\JsonDecodeException;
 use Icinga\Security\SecurityException;
 use Icinga\User;
 use Icinga\Util\Json;
@@ -23,7 +28,6 @@ class OidcController extends CompatController
     public function redirectionEndpointAction(): void
     {
         $state = $this->params->getRequired('state');
-        $code = $this->params->getRequired('code');
 
         $session = Session::getSession()->getNamespace('oidc');
         $login = $session->get('login');
@@ -32,18 +36,59 @@ class OidcController extends CompatController
             throw new SecurityException($this->translate('Invalid or expired state'));
         }
 
+        // Consumed before anything can fail, so the state is single-use. The error page writes the session.
+        $session->delete('login');
+
+        // Checked after the state, so only the provider of this login can make us display a message.
+        // https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1
+        $error = $this->params->get('error');
+
+        if ($error !== null) {
+            $details = array_filter([$this->params->get('error_description'), $this->params->get('error_uri')]);
+
+            $message = sprintf(
+                $this->translate('Authorization server rejected the login: %s'),
+                empty($details) ? $error : $error . ' (' . implode(', ', $details) . ')'
+            );
+
+            if ($error === 'access_denied') {
+                // E.g. the user declined consent. That's no server fault to answer with 500 and log as error.
+                throw new HttpException(403, $message);
+            }
+
+            throw new AuthenticationException($message);
+        }
+
+        $code = $this->params->getRequired('code');
+
         // Resolved up front, so a rejected target costs no token exchange.
         $redirectUrl = (new LoginRedirect('redirect'))->setValue($login->redirect ?? null)->getUrl();
 
         $client = new Client();
 
-        $tokens = Json::decode($client->post($login->discovered->token_endpoint, ['form_params' => [
-            'grant_type'    => 'authorization_code',
-            'code'          => $code,
-            'client_id'     => $login->config->client_id,
-            'client_secret' => $login->config->client_secret,
-            'redirect_uri'  => $login->config->redirect_url
-        ]])->getBody()->getContents());
+        $tokens = $this->requestJson('token', fn () => $client->post($login->discovered->token_endpoint, [
+            'form_params' => [
+                'grant_type'    => 'authorization_code',
+                'code'          => $code,
+                'client_id'     => $login->config->client_id,
+                'client_secret' => $login->config->client_secret,
+                'redirect_uri'  => $login->config->redirect_url
+            ]
+        ]));
+
+        if (! is_string($tokens->id_token ?? null)) {
+            // E.g. an error answered with status 200 instead of 400, so the request didn't fail.
+            if (is_string($tokens->error ?? null)) {
+                throw new AuthenticationException(sprintf(
+                    $this->translate('Authorization server rejected the token request: %s'),
+                    $tokens->error
+                ));
+            }
+
+            throw new AuthenticationException($this->translate(
+                'Authorization server did not return an ID token. Check the provider configuration.'
+            ));
+        }
 
         // "the TLS server validation MAY be used to validate the issuer in place of checking the token signature"
         // -- https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
@@ -66,9 +111,10 @@ class OidcController extends CompatController
             // E.g. GitLab includes groups only in the userinfo endpoint (but groups_direct only in the ID token)
             // https://docs.gitlab.com/integration/openid_connect_provider/
 
-            $userinfo = Json::decode($client->get($login->discovered->userinfo_endpoint, ['headers' => [
-                'Authorization' => "Bearer $tokens->access_token"
-            ]])->getBody()->getContents());
+            $userinfo = $this->requestJson('userinfo', fn () => $client->get(
+                $login->discovered->userinfo_endpoint,
+                ['headers' => ['Authorization' => "Bearer $tokens->access_token"]]
+            ));
 
             if ($username === null) {
                 $username = $userinfo->{$login->config->username_claim} ?? null;
@@ -122,8 +168,41 @@ class OidcController extends CompatController
         $user = (new User($username))->setGroups($groups ?? []);
 
         $this->Auth()->setAuthenticated($user);
-        $session->delete('login');
         AuthenticationHook::triggerLogin($user);
         $this->redirectNow($redirectUrl);
+    }
+
+    private function requestJson(string $name, callable $request): mixed
+    {
+        try {
+            $response = $request();
+        } catch (GuzzleException $e) {
+            // Not chained as previous: the error page shows previous messages, which may contain the server response.
+            Logger::error('OIDC %s request failed: %s', $name, $e);
+
+            if ($e instanceof BadResponseException) {
+                $message = $this->translate(
+                    'Authorization server rejected the %s request. Check the provider configuration.'
+                );
+            } else {
+                $message = $this->translate(
+                    'Failed to reach the authorization server with the %s request. Check its URL, DNS and TLS.'
+                );
+            }
+
+            // 502 for the failed upstream. Unlike with 500, the error page doesn't log it again.
+            throw new HttpException(502, sprintf($message, $name));
+        }
+
+        try {
+            return Json::decode($response->getBody()->getContents());
+        } catch (JsonDecodeException $e) {
+            Logger::error('OIDC %s response is no valid JSON: %s', $name, $e);
+
+            throw new HttpException(502, sprintf(
+                $this->translate('Authorization server sent an invalid %s response. Check the provider configuration.'),
+                $name
+            ));
+        }
     }
 }
