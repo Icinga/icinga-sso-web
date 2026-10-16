@@ -6,6 +6,7 @@
 namespace Icinga\Module\Sso\Controllers;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\GuzzleException;
 use Icinga\Application\Hook\AuthenticationHook;
 use Icinga\Application\Logger;
@@ -165,10 +166,17 @@ class OidcController extends CompatController
             // Not chained as previous: the error page shows previous messages, which may contain the server response.
             Logger::error('OIDC %s request failed: %s', $name, $e);
 
-            throw new AuthenticationException(sprintf(
-                $this->translate('Authorization server rejected the %s request. Check the provider configuration.'),
-                $name
-            ));
+            if ($e instanceof BadResponseException) {
+                $message = $this->translate(
+                    'Authorization server rejected the %s request. Check the provider configuration.'
+                );
+            } else {
+                $message = $this->translate(
+                    'Failed to reach the authorization server with the %s request. Check its URL, DNS and TLS.'
+                );
+            }
+
+            throw new AuthenticationException(sprintf($message, $name));
         }
 
         try {
