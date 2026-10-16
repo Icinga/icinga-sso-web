@@ -33,6 +33,9 @@ class OidcController extends CompatController
             throw new SecurityException($this->translate('Invalid or expired state'));
         }
 
+        // Consumed before anything can fail, so the state is single-use. The error page writes the session.
+        $session->delete('login');
+
         // Checked after the state, so only the provider of this login can make us display a message.
         // https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1
         $error = $this->params->get('error');
@@ -156,7 +159,6 @@ class OidcController extends CompatController
         $user = (new User($username))->setGroups($groups ?? []);
 
         $this->Auth()->setAuthenticated($user);
-        $session->delete('login');
         AuthenticationHook::triggerLogin($user);
         $this->redirectNow($redirectUrl);
     }
