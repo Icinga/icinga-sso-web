@@ -76,6 +76,20 @@ class OidcController extends CompatController
             ]
         ]));
 
+        if (! is_string($tokens->id_token ?? null)) {
+            // E.g. an error answered with status 200 instead of 400, so the request didn't fail.
+            if (is_string($tokens->error ?? null)) {
+                throw new AuthenticationException(sprintf(
+                    $this->translate('Authorization server rejected the token request: %s'),
+                    $tokens->error
+                ));
+            }
+
+            throw new AuthenticationException($this->translate(
+                'Authorization server did not return an ID token. Check the provider configuration.'
+            ));
+        }
+
         // "the TLS server validation MAY be used to validate the issuer in place of checking the token signature"
         // -- https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
         list($header, $payloadBase64Url, $signature) = explode('.', $tokens->id_token);
