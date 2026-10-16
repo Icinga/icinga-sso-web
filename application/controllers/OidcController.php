@@ -91,9 +91,18 @@ class OidcController extends CompatController
             // E.g. GitLab includes groups only in the userinfo endpoint (but groups_direct only in the ID token)
             // https://docs.gitlab.com/integration/openid_connect_provider/
 
-            $userinfo = Json::decode($client->get($login->discovered->userinfo_endpoint, ['headers' => [
-                'Authorization' => "Bearer $tokens->access_token"
-            ]])->getBody()->getContents());
+            try {
+                $userinfo = Json::decode($client->get($login->discovered->userinfo_endpoint, ['headers' => [
+                    'Authorization' => "Bearer $tokens->access_token"
+                ]])->getBody()->getContents());
+            } catch (GuzzleException $e) {
+                // Not chained as previous, see the token request above.
+                Logger::error('OIDC userinfo request failed: %s', $e);
+
+                throw new AuthenticationException($this->translate(
+                    'Authorization server rejected the userinfo request. Check the provider configuration.'
+                ));
+            }
 
             if ($username === null) {
                 $username = $userinfo->{$login->config->username_claim} ?? null;
