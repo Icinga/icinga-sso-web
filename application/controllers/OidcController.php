@@ -36,11 +36,11 @@ class OidcController extends CompatController
         $error = $this->params->get('error');
 
         if ($error !== null) {
-            $description = $this->params->get('error_description');
+            $details = array_filter([$this->params->get('error_description'), $this->params->get('error_uri')]);
 
             throw new AuthenticationException(sprintf(
                 $this->translate('Authorization server rejected the login: %s'),
-                $description === null ? $error : "$error ($description)"
+                empty($details) ? $error : $error . ' (' . implode(', ', $details) . ')'
             ));
         }
 
