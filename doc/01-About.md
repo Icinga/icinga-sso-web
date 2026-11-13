@@ -7,6 +7,7 @@ Users are authenticated against the chosen provider and logged in to Icinga Web.
 ## Features
 
 * Multiple providers can be configured simultaneously, each gets its own login button
+* Each provider has a login URL that skips the Icinga Web login page, e.g. for the application portal of the provider
 * The username claim is configurable per provider: nickname (e.g. jdoe), full name (e.g. John Doe), ...
 * Group mapping from a provider to Icinga Web groups is optional
 * The claim used for group names is configurable per provider
