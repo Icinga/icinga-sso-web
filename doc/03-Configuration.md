@@ -39,6 +39,15 @@ A providers group\_claim can be an array or a comma seperated list.
 | groupname\_search  | PCRE regex to match against upstream group names              | `/^(.*)$/i`         |
 | groupname\_replace | Replacement string; back-references like `${1}` are supported | `gitlab-group-${1}` |
 
+To strip the domain from usernames such as `jdoe@example.com`, use one of these
+settings. In both cases, the user logs in as `jdoe`.
+
+* Set username\_search to `/@.*$/` and leave username\_replace empty. This
+  deletes the matched domain.
+* Set username\_search to `/^([^@]+)@.*$/` and username\_replace to `${1}`.
+  This keeps only the captured part before the `@`. Set username\_replace to
+  `entra-${1}`, for example, to also add a prefix.
+
 ## Security Notes
 
 * Managing providers requires the `config/modules` permission.
