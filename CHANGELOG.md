@@ -4,6 +4,9 @@ All notable changes to this module are documented in this file.
 
 ## [Unreleased]
 
+- Fix the logout after the first token refresh if the provider doesn't rotate the
+  refresh token (#35)
+
 ## [1.0.0] - 2026-06-26
 
 - Initial release
