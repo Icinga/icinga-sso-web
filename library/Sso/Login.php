@@ -59,12 +59,17 @@ class Login
         // Others don't know it at all and hard-reject it, but provide refresh tokens by default.
         // Hence, we must include offline_access in the default set, but strip it if it's not supported.
         // Same with the groups scope for group mapping.
+        // scopes_supported is optional, so a provider without it gets all configured scopes.
+        // https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+        $scopes = Str::trimSplit($config->get('scopes'), ' ');
+
+        if (is_array($openidCfg->scopes_supported ?? null)) {
+            $scopes = array_intersect($scopes, $openidCfg->scopes_supported);
+        }
+
         $response->redirectAndExit(Url::fromPath($openidCfg->authorization_endpoint, [
             'client_id'     => $config->get('client_id'),
-            'scope'         => implode(' ', array_intersect(
-                Str::trimSplit($config->get('scopes'), ' '),
-                $openidCfg->scopes_supported
-            )),
+            'scope'         => implode(' ', $scopes),
             'redirect_uri'  => $config->get('redirect_url'),
             'response_type' => 'code',
             'state'         => $state,
