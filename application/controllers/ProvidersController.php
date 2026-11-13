@@ -69,7 +69,7 @@ class ProvidersController extends CompatController
         $section['advanced_settings'] = $section;
 
         $this->modalizeForm(
-            (new ProviderForm())
+            (new ProviderForm($id))
                 ->populate($section)
                 ->on(ProviderForm::ON_SUCCESS, function (ProviderForm $form) use ($id, $config): void {
                     $config->setSection($id, $form->getFlatValues());

@@ -22,6 +22,15 @@ class ProviderForm extends CompatForm
     use CsrfCounterMeasure;
     use Translation;
 
+    /**
+     * Create a new ProviderForm
+     *
+     * @param ?string $providerId ID of the provider to edit, or null for a new provider
+     */
+    public function __construct(protected readonly ?string $providerId = null)
+    {
+    }
+
     protected function assemble(): void
     {
         $this->addElement('text', 'name', [
@@ -70,6 +79,31 @@ class ProviderForm extends CompatForm
             'class'       => 'resolve-absolute-url',
             'required'    => true
         ]);
+
+        if ($this->providerId !== null) {
+            $loginUrl = Url::fromPath('sso/oidc/login', ['provider' => $this->providerId]);
+            $redirectUrl = $this->getPopulatedValue('redirect_url');
+
+            // The login works only on the host of the redirect URL, because the login state lives in the session.
+            if (is_string($redirectUrl) && str_ends_with($redirectUrl, '/sso/oidc/redirection-endpoint')) {
+                $loginUrl = Url::fromPath(
+                    substr($redirectUrl, 0, -strlen('redirection-endpoint')) . 'login',
+                    ['provider' => $this->providerId]
+                );
+            }
+
+            $this->addElement('text', 'login_url', [
+                'label'       => $this->translate('Login URL'),
+                'description' => $this->translate(
+                    'Starts the login with this provider without the Icinga Web login page,'
+                    . ' e.g. from the application portal of your identity provider'
+                ),
+                'value'       => $loginUrl->getAbsoluteUrl(),
+                'class'       => 'resolve-absolute-url',
+                'readonly'    => true,
+                'ignore'      => true
+            ]);
+        }
 
         $this->addElement('text', 'username_claim', [
             'label'       => $this->translate('Username Field'),
