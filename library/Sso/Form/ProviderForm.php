@@ -6,6 +6,8 @@
 namespace Icinga\Module\Sso\Form;
 
 use GuzzleHttp\Client;
+use Icinga\Application\Hook\AuthenticationHook;
+use Icinga\Module\Sso\ProvidedHook\Authentication;
 use Icinga\Util\Json;
 use Icinga\Web\Session;
 use ipl\Html\FormElement\FieldsetElement;
@@ -70,6 +72,35 @@ class ProviderForm extends CompatForm
             'class'       => 'resolve-absolute-url',
             'required'    => true
         ]);
+
+        // Icinga Web versions without this hook method can't redirect to the provider after logout.
+        if (method_exists(AuthenticationHook::class, 'getLogoutRedirectUrl')) {
+            $this->addElement('checkbox', 'logout_at_provider', [
+                'label'       => $this->translate('Log out at Provider'),
+                'description' => $this->translate(
+                    'End the session at the provider, too, when logging out of Icinga Web.'
+                    . ' The provider must support OpenID Connect RP-initiated logout,'
+                    . ' and the post logout redirect URL must be registered there'
+                ),
+                'class'       => 'autosubmit'
+            ]);
+
+            if ($this->getPopulatedValue('logout_at_provider') === 'y') {
+                // Disabled, so the browser doesn't submit it and the value follows the redirect URL.
+                $this->addElement('text', 'post_logout_redirect_url', [
+                    'label'       => $this->translate('Post Logout Redirect URL'),
+                    'description' => $this->translate(
+                        'Register this URL at the provider. It has the scheme, host and port of the redirect URL'
+                    ),
+                    'value'       => Authentication::getPostLogoutRedirectUri(
+                        (string) $this->getPopulatedValue('redirect_url')
+                    ),
+                    'class'       => 'resolve-absolute-url',
+                    'disabled'    => true,
+                    'ignore'      => true
+                ]);
+            }
+        }
 
         $this->addElement('text', 'username_claim', [
             'label'       => $this->translate('Username Field'),
