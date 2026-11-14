@@ -8,6 +8,7 @@ namespace Icinga\Module\Sso\ProvidedHook;
 use GuzzleHttp\Client;
 use Icinga\Application\Hook\ApplicationStateHook;
 use Icinga\Application\Hook\AuthenticationHook;
+use Icinga\Application\Logger;
 use Icinga\Authentication\Auth;
 use Icinga\User;
 use Icinga\Util\Json;
@@ -22,6 +23,8 @@ class Authentication extends AuthenticationHook
      * This is intentionally not done via {@link ApplicationStateHook}.
      * An attacker could otherwise block own requests to /application-state and stay logged in forever.
      *
+     * Logs the user out if the access token expired and the session has no refresh token.
+     *
      * @param User $user
      */
     public function onAuthFromSession(User $user): void
@@ -34,11 +37,23 @@ class Authentication extends AuthenticationHook
             return;
         }
 
+        $refreshToken = $session->tokens->refresh_token ?? '';
+
+        if ($refreshToken === '') {
+            Auth::getInstance()->removeAuthorization();
+            Logger::info(
+                'Logged out user "%s" because the access token expired and the session has no refresh token',
+                $user->getUsername()
+            );
+
+            return;
+        }
+
         try {
             $tokens = Json::decode(
                 (new Client())->post($provider->discovered->token_endpoint, ['form_params' => [
                     'grant_type'    => 'refresh_token',
-                    'refresh_token' => $session->tokens->refresh_token,
+                    'refresh_token' => $refreshToken,
                     'client_id'     => $provider->config->client_id,
                     'client_secret' => $provider->config->client_secret
                 ]])->getBody()->getContents()
@@ -46,7 +61,7 @@ class Authentication extends AuthenticationHook
 
             // The server MAY omit the refresh token if it did not rotate it. In that case, keep using the old one.
             // https://datatracker.ietf.org/doc/html/rfc6749#section-6
-            $tokens->refresh_token ??= $session->tokens->refresh_token;
+            $tokens->refresh_token ??= $refreshToken;
 
             $nsp->set('session', (object) [
                 'mtime'  => time(),
