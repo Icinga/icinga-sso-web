@@ -30,6 +30,19 @@ automatically falls back to the provider's userinfo endpoint.
 
 A providers group\_claim can be an array or a comma seperated list. 
 
+New providers start with the scopes `openid profile offline_access groups`:
+
+* `openid` makes the provider return an ID token. OpenID Connect requires it.
+* `profile` provides claims such as `preferred_username` and `name`.
+* `offline_access` makes many providers issue a refresh token. Without one,
+  users are logged out when their access token expires, often after an hour.
+* `groups` provides the group memberships for group mapping. It is no standard
+  scope, but common providers use it.
+
+If the provider lists its supported scopes in its discovery document, Icinga
+Web SSO requests only the configured scopes from that list. The OAuth
+application in the provider must allow these scopes.
+
 ### Advanced Settings
 
 | Field              | Description                                                   | Example             |
