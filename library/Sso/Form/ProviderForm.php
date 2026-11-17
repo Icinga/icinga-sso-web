@@ -57,7 +57,10 @@ class ProviderForm extends CompatForm
         // Many providers require the offline_access scope for refresh tokens
         $this->addElement('text', 'scopes', [
             'label'       => $this->translate('OAuth Scopes'),
-            'description' => $this->translate('Space separated, your OAuth application must allow these'),
+            'description' => $this->translate(
+                'Space separated. The defaults cover login, profile, group mapping and refresh tokens.'
+                . ' Your OAuth application must allow the scopes.'
+            ),
             'value'       => 'openid profile offline_access groups',
         ]);
 

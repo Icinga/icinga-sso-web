@@ -90,6 +90,15 @@ class OidcController extends CompatController
             ));
         }
 
+        if (($tokens->refresh_token ?? '') === '') {
+            Logger::warning(
+                'OIDC token response of provider "%s" contains no refresh token.'
+                . ' Users get logged out when the access token expires.'
+                . ' Add the scope offline_access to the provider if it supports refresh tokens.',
+                $login->config->name
+            );
+        }
+
         // "the TLS server validation MAY be used to validate the issuer in place of checking the token signature"
         // -- https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
         list($header, $payloadBase64Url, $signature) = explode('.', $tokens->id_token);
