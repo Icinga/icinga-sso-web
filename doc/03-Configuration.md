@@ -39,6 +39,25 @@ A providers group\_claim can be an array or a comma seperated list.
 | groupname\_search  | PCRE regex to match against upstream group names              | `/^(.*)$/i`         |
 | groupname\_replace | Replacement string; back-references like `${1}` are supported | `gitlab-group-${1}` |
 
+## HTTP Proxy
+
+Server-side requests to the OpenID Connect provider use Guzzle's proxy environment
+settings. Set `HTTPS_PROXY` to the proxy URL for HTTPS requests and `NO_PROXY` to a
+comma-separated list of hosts or domains that should bypass the proxy. Make these
+variables available to the PHP instance running Icinga Web. The module has no
+separate proxy setting.
+
+See [Guzzle's environment variable documentation][guzzle-proxy] for details.
+With Apache and `mod_php`, use [Apache's `SetEnv` directive][apache-env].
+For passing variables to PHP-FPM, see the [nginx][nginx-fastcgi] or
+[Apache][apache-fastcgi] documentation. These settings affect server-side provider
+requests and do not configure the user's browser.
+
+[guzzle-proxy]: https://docs.guzzlephp.org/en/stable/quickstart.html#environment-variables
+[apache-env]: https://httpd.apache.org/docs/2.4/mod/mod_env.html#setenv
+[nginx-fastcgi]: https://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_param
+[apache-fastcgi]: https://httpd.apache.org/docs/2.4/mod/mod_proxy_fcgi.html#proxyfcgisetenvif
+
 ## Security Notes
 
 * Managing providers requires the `config/modules` permission.
