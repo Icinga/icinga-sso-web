@@ -18,6 +18,44 @@ use ipl\Web\Url;
 class Login
 {
     /**
+     * Get the login URL on the host of the given redirect URL
+     *
+     * The login state lives in the session, which belongs to a single host. The login has to start on the host
+     * the provider returns the user to, which is the host of the redirect URL.
+     *
+     * @param string $redirectUrl Redirect URL of the provider
+     * @param string $providerId ID of the provider
+     *
+     * @return ?Url Absolute login URL, or null if the redirect URL isn't a redirection endpoint of this module
+     */
+    public static function getUrl(string $redirectUrl, string $providerId): ?Url
+    {
+        $parts = parse_url($redirectUrl);
+        $endpointPath = isset($parts['path']) ? rtrim($parts['path'], '/') : '';
+
+        if (
+            ! isset($parts['scheme'], $parts['host'])
+            || ! str_ends_with($endpointPath, '/sso/oidc/redirection-endpoint')
+        ) {
+            return null;
+        }
+
+        $path = substr($endpointPath, 0, -strlen('redirection-endpoint')) . 'login';
+
+        // Url::fromPath() treats a URL as internal only if its scheme, host and port match those of the request
+        // (SERVER_NAME and SERVER_PORT) and then drops all three. module.js would resolve the remaining relative URL
+        // against the host of the browser. The scheme, host and port are set explicitly to get an absolute URL on the
+        // host of the redirect URL in any case.
+        return Url::fromPath($path, ['provider' => $providerId])
+            ->setIsExternal()
+            ->setScheme($parts['scheme'])
+            ->setHost($parts['host'])
+            ->setPort((string) ($parts['port'] ?? ''))
+            ->setBasePath('/')
+            ->setPath(ltrim($path, '/'));
+    }
+
+    /**
      * Redirect the user to the authorization endpoint of the given provider and exit
      *
      * Stores the login state in the session. After the login,
