@@ -6,14 +6,10 @@
 namespace Icinga\Module\Sso\Controllers;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\BadResponseException;
-use GuzzleHttp\Exception\GuzzleException;
 use Icinga\Application\Hook\AuthenticationHook;
-use Icinga\Application\Logger;
 use Icinga\Application\Modules\Manager;
 use Icinga\Exception\AuthenticationException;
 use Icinga\Exception\Http\HttpException;
-use Icinga\Exception\Json\JsonDecodeException;
 use Icinga\Module\Sso\Login;
 use Icinga\Security\SecurityException;
 use Icinga\User;
@@ -82,15 +78,8 @@ class OidcController extends CompatController
         }
 
         $config = $providers->getSection($id);
-        $openidCfg = $this->requestJson('discovery', fn () => (new Client())->get($config->get('base_url')));
 
-        if (! is_string($openidCfg->authorization_endpoint ?? null)) {
-            throw new HttpException(502, $this->translate(
-                'Authorization server sent an invalid discovery response. Check the provider configuration.'
-            ));
-        }
-
-        Login::start($config, $openidCfg, $this->params->get('redirect'));
+        Login::start($config, Login::discover($config), $this->params->get('redirect'));
     }
 
     public function redirectionEndpointAction(): void
@@ -134,7 +123,8 @@ class OidcController extends CompatController
 
         $client = new Client();
 
-        $tokens = $this->requestJson('token', fn () => $client->post($login->discovered->token_endpoint, [
+        $tokenEndpoint = $login->discovered->token_endpoint;
+        $tokens = Login::requestJson('token', $tokenEndpoint, fn () => $client->post($tokenEndpoint, [
             'form_params' => [
                 'grant_type'    => 'authorization_code',
                 'code'          => $code,
@@ -179,8 +169,9 @@ class OidcController extends CompatController
             // E.g. GitLab includes groups only in the userinfo endpoint (but groups_direct only in the ID token)
             // https://docs.gitlab.com/integration/openid_connect_provider/
 
-            $userinfo = $this->requestJson('userinfo', fn () => $client->get(
-                $login->discovered->userinfo_endpoint,
+            $userinfoEndpoint = $login->discovered->userinfo_endpoint;
+            $userinfo = Login::requestJson('userinfo', $userinfoEndpoint, fn () => $client->get(
+                $userinfoEndpoint,
                 ['headers' => ['Authorization' => "Bearer $tokens->access_token"]]
             ));
 
@@ -238,39 +229,5 @@ class OidcController extends CompatController
         $this->Auth()->setAuthenticated($user);
         AuthenticationHook::triggerLogin($user);
         $this->redirectNow($redirectUrl);
-    }
-
-    private function requestJson(string $name, callable $request): mixed
-    {
-        try {
-            $response = $request();
-        } catch (GuzzleException $e) {
-            // Not chained as previous: the error page shows previous messages, which may contain the server response.
-            Logger::error('OIDC %s request failed: %s', $name, $e);
-
-            if ($e instanceof BadResponseException) {
-                $message = $this->translate(
-                    'Authorization server rejected the %s request. Check the provider configuration.'
-                );
-            } else {
-                $message = $this->translate(
-                    'Failed to reach the authorization server with the %s request. Check its URL, DNS and TLS.'
-                );
-            }
-
-            // 502 for the failed upstream. Unlike with 500, the error page doesn't log it again.
-            throw new HttpException(502, sprintf($message, $name));
-        }
-
-        try {
-            return Json::decode($response->getBody()->getContents());
-        } catch (JsonDecodeException $e) {
-            Logger::error('OIDC %s response is no valid JSON: %s', $name, $e);
-
-            throw new HttpException(502, sprintf(
-                $this->translate('Authorization server sent an invalid %s response. Check the provider configuration.'),
-                $name
-            ));
-        }
     }
 }
