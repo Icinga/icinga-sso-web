@@ -5,10 +5,10 @@
 
 namespace Icinga\Module\Sso\ProvidedHook;
 
-use GuzzleHttp\Client;
 use Icinga\Application\Hook\ApplicationStateHook;
 use Icinga\Application\Hook\AuthenticationHook;
 use Icinga\Authentication\Auth;
+use Icinga\Module\Sso\Login;
 use Icinga\User;
 use Icinga\Util\Json;
 use Icinga\Web\Session;
@@ -36,7 +36,7 @@ class Authentication extends AuthenticationHook
 
         try {
             $tokens = Json::decode(
-                (new Client())->post($provider->discovered->token_endpoint, ['form_params' => [
+                Login::createClient()->post($provider->discovered->token_endpoint, ['form_params' => [
                     'grant_type'    => 'refresh_token',
                     'refresh_token' => $session->tokens->refresh_token,
                     'client_id'     => $provider->config->client_id,

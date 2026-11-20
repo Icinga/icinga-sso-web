@@ -40,7 +40,11 @@ class Login
     public static function discover(ConfigObject $config): object
     {
         $url = $config->get('base_url');
-        $openidCfg = static::requestJson('discovery', $url, fn (): ResponseInterface => (new Client())->get($url));
+        $openidCfg = static::requestJson(
+            'discovery',
+            $url,
+            fn (): ResponseInterface => static::createClient()->get($url)
+        );
 
         if (! is_object($openidCfg) || ! is_string($openidCfg->authorization_endpoint ?? null)) {
             Logger::error('OIDC discovery response from %s has no authorization endpoint', $url);
@@ -49,6 +53,24 @@ class Login
         }
 
         return $openidCfg;
+    }
+
+    /**
+     * Create an HTTP client for requests to the authorization server
+     *
+     * A request fails if it takes longer than 10s in total or 5s to connect.
+     *
+     * @return Client
+     */
+    public static function createClient(): Client
+    {
+        // Guzzle has no total timeout and cURL waits up to 300s for a connection by default. Without limits, a
+        // provider that drops packets blocks the request until the kernel gives up on the connection after about
+        // 135s, and a provider that accepts the connection and then stalls blocks it without end. PHP's
+        // max_execution_time doesn't end this wait. The limits give an unreachable server a readable error instead.
+        // 5s is plenty for DNS, TCP and TLS, and 10s for a small JSON response. The redirection endpoint sends up to
+        // two requests, which take at most 20s together and fit into the common max_execution_time of 30s.
+        return new Client(['connect_timeout' => 5, 'timeout' => 10]);
     }
 
     /**
