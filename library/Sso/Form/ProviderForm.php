@@ -17,6 +17,12 @@ use ipl\Web\Compat\CompatForm;
 use ipl\Web\Url;
 use Throwable;
 
+/**
+ * Form to add or edit an OpenID Connect provider
+ *
+ * Validation fetches the discovery document of the provider. If that fails, the form
+ * shows the error and offers a checkbox to save the changes anyway.
+ */
 class ProviderForm extends CompatForm
 {
     use CsrfCounterMeasure;
