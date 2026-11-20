@@ -6,10 +6,13 @@
 namespace Icinga\Module\Sso\Form;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Exception\MalformedUriException;
+use GuzzleHttp\Psr7\Uri;
 use Icinga\Util\Json;
 use Icinga\Web\Session;
 use ipl\Html\FormElement\FieldsetElement;
 use ipl\I18n\Translation;
+use ipl\Validator\CallbackValidator;
 use ipl\Validator\RegexMatchValidator;
 use ipl\Validator\RegexSyntaxValidator;
 use ipl\Web\Common\CsrfCounterMeasure;
@@ -45,10 +48,24 @@ class ProviderForm extends CompatForm
             'placeholder' => 'https://example.com/.well-known/openid-configuration',
             'required'    => true,
             'class'       => 'autosubmit',
-            'validators'  => [new RegexMatchValidator([
-                'pattern'         => '~\Ahttps?://~',
-                'notMatchMessage' => $this->translate('The URL must start with http:// or https://')
-            ])]
+            'validators'  => [
+                new RegexMatchValidator([
+                    'pattern'         => '~\Ahttps?://~',
+                    'notMatchMessage' => $this->translate('The URL must start with http:// or https://')
+                ]),
+                // Rejects a URL that Guzzle can't parse, also with "Force Changes", because no login can use it.
+                new CallbackValidator(function (string $value, CallbackValidator $validator): bool {
+                    try {
+                        new Uri($value);
+                    } catch (MalformedUriException $e) {
+                        $validator->addMessage(sprintf($this->translate('The URL is invalid: %s'), $e->getMessage()));
+
+                        return false;
+                    }
+
+                    return true;
+                })
+            ]
         ]);
 
         $this->addElement('text', 'client_id', [

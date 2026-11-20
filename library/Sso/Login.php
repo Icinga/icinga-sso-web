@@ -8,6 +8,7 @@ namespace Icinga\Module\Sso;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Psr7\Exception\MalformedUriException;
 use Icinga\Application\Icinga;
 use Icinga\Application\Logger;
 use Icinga\Data\ConfigObject;
@@ -54,8 +55,9 @@ class Login
     /**
      * Send a request to the authorization server and decode its JSON response
      *
-     * Logs the details of a failure once and throws an exception with a message that tells an unreachable server apart
-     * from a rejection and an invalid response.
+     * Logs the details of a failure once and throws an exception with a message that tells an invalid URL and an
+     * unreachable server apart from a rejection and an invalid response. The status is 500 for an invalid discovery
+     * URL, which is local configuration, and 502 for every other failure.
      *
      * @param string $name Name of the request, e.g. `token`
      * @param string $url URL of the request, for the log
@@ -63,12 +65,21 @@ class Login
      *
      * @return mixed Decoded response body
      *
-     * @throws HttpException If the request fails or the response is no valid JSON
+     * @throws HttpException If the URL is invalid, the request fails or the response is no valid JSON
      */
     public static function requestJson(string $name, string $url, callable $request): mixed
     {
         try {
             $response = $request();
+        } catch (MalformedUriException $e) {
+            // Guzzle throws it before sending, and it is no GuzzleException.
+            Logger::error('OIDC %s URL %s is invalid: %s', $name, $url, $e);
+
+            // The discovery URL is local configuration. The token and userinfo URLs come from the discovery document.
+            throw new HttpException($name === 'discovery' ? 500 : 502, sprintf(
+                static::translate('Invalid %s URL for the authorization server. Check the provider configuration.'),
+                $name
+            ));
         } catch (GuzzleException $e) {
             // Not chained as previous: the error page shows previous messages, which may contain the server response.
             Logger::error('OIDC %s request failed: %s', $name, $e);
