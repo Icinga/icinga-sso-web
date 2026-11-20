@@ -25,11 +25,15 @@ class ButtonHook extends LoginButtonHook
 
         foreach (Config::module('sso', 'providers') as $id => $section) {
             $buttons[$id] = new LoginButton(
-                function () use ($section): void {
+                function () use ($id, $section): void {
+                    $redirect = Url::fromRequest()->getParam('redirect');
+
+                    Login::switchHost($section, (string) $id, $redirect);
+
                     Login::start(
                         $section,
                         Json::decode((new Client())->get($section->get('base_url'))->getBody()->getContents()),
-                        Url::fromRequest()->getParam('redirect')
+                        $redirect
                     );
                 },
                 new Text(sprintf($this->translate('Login with %s'), $section->name))

@@ -56,6 +56,13 @@ parameter to land on another Icinga Web page, for example
 `&redirect=icingadb%2Fhosts`. Users who are already logged in go straight to
 that page.
 
+Users who open Icinga Web on another host, for example under a short name, are
+sent to the host of the redirect URL when they click the login button. They stay
+on that host after the login. The comparison uses the host and port of the `Host`
+header as Icinga Web receives it. The scheme is not compared. This applies only
+if the path of the redirect URL ends with `/sso/oidc/redirection-endpoint`,
+optionally followed by a slash.
+
 ## Security Notes
 
 * Managing providers requires the `config/modules` permission.

@@ -6,6 +6,7 @@
 namespace Icinga\Module\Sso\Form;
 
 use GuzzleHttp\Client;
+use Icinga\Module\Sso\Login;
 use Icinga\Util\Json;
 use Icinga\Web\Session;
 use ipl\Html\FormElement\FieldsetElement;
@@ -84,30 +85,11 @@ class ProviderForm extends CompatForm
             // The field shows a derived value, which a posted value must not replace.
             $this->clearPopulatedValue('login_url');
 
-            $loginUrl = Url::fromPath('sso/oidc/login', ['provider' => $this->providerId]);
             $redirectUrl = $this->getPopulatedValue('redirect_url');
-            $parts = is_string($redirectUrl) ? parse_url($redirectUrl) : false;
-            $endpointPath = isset($parts['path']) ? rtrim($parts['path'], '/') : '';
 
             // The login works only on the host of the redirect URL, because the login state lives in the session.
-            if (
-                isset($parts['scheme'], $parts['host'])
-                && str_ends_with($endpointPath, '/sso/oidc/redirection-endpoint')
-            ) {
-                $path = substr($endpointPath, 0, -strlen('redirection-endpoint')) . 'login';
-
-                // Url::fromPath() treats a URL as internal only if its scheme, host and port match those of the
-                // request (SERVER_NAME and SERVER_PORT) and then drops all three. module.js would resolve the
-                // remaining relative URL against the host of the browser. The scheme, host and port are set
-                // explicitly to get an absolute URL on the host of the redirect URL in any case.
-                $loginUrl = Url::fromPath($path, ['provider' => $this->providerId])
-                    ->setIsExternal()
-                    ->setScheme($parts['scheme'])
-                    ->setHost($parts['host'])
-                    ->setPort((string) ($parts['port'] ?? ''))
-                    ->setBasePath('/')
-                    ->setPath(ltrim($path, '/'));
-            }
+            $loginUrl = is_string($redirectUrl) ? Login::getUrl($redirectUrl, $this->providerId) : null;
+            $loginUrl ??= Url::fromPath('sso/oidc/login', ['provider' => $this->providerId]);
 
             $this->addElement('text', 'login_url', [
                 'label'       => $this->translate('Login URL'),
