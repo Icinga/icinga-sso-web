@@ -10,9 +10,11 @@ use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\GuzzleException;
 use Icinga\Application\Hook\AuthenticationHook;
 use Icinga\Application\Logger;
+use Icinga\Application\Modules\Manager;
 use Icinga\Exception\AuthenticationException;
 use Icinga\Exception\Http\HttpException;
 use Icinga\Exception\Json\JsonDecodeException;
+use Icinga\Module\Sso\Login;
 use Icinga\Security\SecurityException;
 use Icinga\User;
 use Icinga\Util\Json;
@@ -24,6 +26,72 @@ use ipl\Stdlib\Str;
 class OidcController extends CompatController
 {
     protected $requiresAuthentication = false;
+
+    /**
+     * Assert the given permission, except the module permission for the login action
+     *
+     * The module permission is asserted for every logged-in user before an action runs. The login action redirects
+     * logged-in users to a target that checks its own permissions and starts the login for everyone else. Users who
+     * lack the module permission must reach it as well.
+     *
+     * @param string $permission Name of the permission
+     *
+     * @return void
+     *
+     * @throws SecurityException If the current user lacks the given permission
+     */
+    public function assertPermission($permission): void
+    {
+        if (
+            $this->getRequest()->getActionName() === 'login'
+            && $permission === Manager::MODULE_PERMISSION_NS . $this->getModuleName()
+        ) {
+            return;
+        }
+
+        parent::assertPermission($permission);
+    }
+
+    /**
+     * Start the login with the provider given by the `provider` parameter
+     *
+     * Identity providers link to this URL to log users in without the Icinga Web login page.
+     * Users who are already logged in go straight to the `redirect` parameter.
+     *
+     * @return void
+     *
+     * @throws \Icinga\Exception\Http\HttpBadRequestException If the `redirect` parameter points to an external URL
+     * @throws \Icinga\Exception\MissingParameterException If the `provider` parameter is missing
+     * @throws \Icinga\Exception\Http\HttpNotFoundException If the provider doesn't exist
+     * @throws HttpException If the discovery request to the provider fails or its response is invalid
+     */
+    public function loginAction(): void
+    {
+        // Checked up front, so a rejected target doesn't fail only after the login with the provider.
+        $redirectUrl = (new LoginRedirect('redirect'))->setValue($this->params->get('redirect'))->getUrl();
+
+        if ($this->Auth()->isAuthenticated()) {
+            $this->redirectNow($redirectUrl);
+        }
+
+        $id = $this->params->getRequired('provider');
+        $providers = $this->Config('providers');
+
+        if (! $providers->hasSection($id)) {
+            $this->httpNotFound($this->translate('Provider not found'));
+        }
+
+        $config = $providers->getSection($id);
+        $openidCfg = $this->requestJson('discovery', fn () => (new Client())->get($config->get('base_url')));
+
+        if (! is_string($openidCfg->authorization_endpoint ?? null)) {
+            throw new HttpException(502, $this->translate(
+                'Authorization server sent an invalid discovery response. Check the provider configuration.'
+            ));
+        }
+
+        Login::start($config, $openidCfg, $this->params->get('redirect'));
+    }
 
     public function redirectionEndpointAction(): void
     {

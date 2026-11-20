@@ -22,6 +22,15 @@ class ProviderForm extends CompatForm
     use CsrfCounterMeasure;
     use Translation;
 
+    /**
+     * Create a new ProviderForm
+     *
+     * @param ?string $providerId ID of the provider to edit, or null for a new provider
+     */
+    public function __construct(protected readonly ?string $providerId = null)
+    {
+    }
+
     protected function assemble(): void
     {
         $this->addElement('text', 'name', [
@@ -70,6 +79,48 @@ class ProviderForm extends CompatForm
             'class'       => 'resolve-absolute-url',
             'required'    => true
         ]);
+
+        if ($this->providerId !== null) {
+            // The field shows a derived value, which a posted value must not replace.
+            $this->clearPopulatedValue('login_url');
+
+            $loginUrl = Url::fromPath('sso/oidc/login', ['provider' => $this->providerId]);
+            $redirectUrl = $this->getPopulatedValue('redirect_url');
+            $parts = is_string($redirectUrl) ? parse_url($redirectUrl) : false;
+            $endpointPath = isset($parts['path']) ? rtrim($parts['path'], '/') : '';
+
+            // The login works only on the host of the redirect URL, because the login state lives in the session.
+            if (
+                isset($parts['scheme'], $parts['host'])
+                && str_ends_with($endpointPath, '/sso/oidc/redirection-endpoint')
+            ) {
+                $path = substr($endpointPath, 0, -strlen('redirection-endpoint')) . 'login';
+
+                // Url::fromPath() treats a URL as internal only if its scheme, host and port match those of the
+                // request (SERVER_NAME and SERVER_PORT) and then drops all three. module.js would resolve the
+                // remaining relative URL against the host of the browser. The scheme, host and port are set
+                // explicitly to get an absolute URL on the host of the redirect URL in any case.
+                $loginUrl = Url::fromPath($path, ['provider' => $this->providerId])
+                    ->setIsExternal()
+                    ->setScheme($parts['scheme'])
+                    ->setHost($parts['host'])
+                    ->setPort((string) ($parts['port'] ?? ''))
+                    ->setBasePath('/')
+                    ->setPath(ltrim($path, '/'));
+            }
+
+            $this->addElement('text', 'login_url', [
+                'label'       => $this->translate('Login URL'),
+                'description' => $this->translate(
+                    'Starts the login with this provider without the Icinga Web login page,'
+                    . ' e.g. from the application portal of your identity provider'
+                ),
+                'value'       => $loginUrl->getAbsoluteUrl(),
+                'class'       => 'resolve-absolute-url',
+                'readonly'    => true,
+                'ignore'      => true
+            ]);
+        }
 
         $this->addElement('text', 'username_claim', [
             'label'       => $this->translate('Username Field'),

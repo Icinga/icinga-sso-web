@@ -39,6 +39,23 @@ A providers group\_claim can be an array or a comma seperated list.
 | groupname\_search  | PCRE regex to match against upstream group names              | `/^(.*)$/i`         |
 | groupname\_replace | Replacement string; back-references like `${1}` are supported | `gitlab-group-${1}` |
 
+## Login URL
+
+Each provider has a login URL that starts the login with this provider without
+showing the Icinga Web login page. Use it as the launch or home page URL of the
+application in your identity provider. Open the provider in
+`Configuration → Modules → sso → Providers` to copy its login URL. It looks like
+`https://example.com/icingaweb2/sso/oidc/login?provider=6a1f0c2d9e8b7`.
+The login URL uses the host and port of the redirect URL, because the login only
+works on that host. This requires the path of the redirect URL to end with
+`/sso/oidc/redirection-endpoint`, optionally followed by a slash. Otherwise the
+login URL shows the host you opened Icinga Web on.
+
+After the login, users land on the dashboard. Add a URL-encoded `redirect`
+parameter to land on another Icinga Web page, for example
+`&redirect=icingadb%2Fhosts`. Users who are already logged in go straight to
+that page.
+
 ## Security Notes
 
 * Managing providers requires the `config/modules` permission.
