@@ -83,7 +83,7 @@ class Login
                 );
             }
 
-            // 502 for the failed upstream. Unlike with 500, the error page doesn't log it again.
+            // 502 because the upstream request failed.
             throw new HttpException(502, sprintf($message, $name));
         }
 
