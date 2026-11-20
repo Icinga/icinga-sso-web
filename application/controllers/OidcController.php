@@ -5,7 +5,6 @@
 
 namespace Icinga\Module\Sso\Controllers;
 
-use GuzzleHttp\Client;
 use Icinga\Application\Hook\AuthenticationHook;
 use Icinga\Application\Modules\Manager;
 use Icinga\Exception\AuthenticationException;
@@ -121,7 +120,7 @@ class OidcController extends CompatController
         // Resolved up front, so a rejected target costs no token exchange.
         $redirectUrl = (new LoginRedirect('redirect'))->setValue($login->redirect ?? null)->getUrl();
 
-        $client = new Client();
+        $client = Login::createClient();
 
         $tokenEndpoint = $login->discovered->token_endpoint;
         $tokens = Login::requestJson('token', $tokenEndpoint, fn () => $client->post($tokenEndpoint, [

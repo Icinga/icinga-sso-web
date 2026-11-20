@@ -5,7 +5,7 @@
 
 namespace Icinga\Module\Sso\Form;
 
-use GuzzleHttp\Client;
+use Icinga\Module\Sso\Login;
 use Icinga\Util\Json;
 use Icinga\Web\Session;
 use ipl\Html\FormElement\FieldsetElement;
@@ -192,7 +192,7 @@ class ProviderForm extends CompatForm
         }
 
         try {
-            Json::decode((new Client())->get($this->getValue('base_url'))->getBody()->getContents());
+            Json::decode(Login::createClient()->get($this->getValue('base_url'))->getBody()->getContents());
         } catch (Throwable $e) {
             $this->addMessage(
                 $this->translate('Failed to contact the OpenID provider: %s'),
