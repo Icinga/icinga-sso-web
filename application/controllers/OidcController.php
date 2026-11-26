@@ -13,6 +13,7 @@ use Icinga\User;
 use Icinga\Util\Json;
 use Icinga\Web\Session;
 use ipl\Web\Compat\CompatController;
+use ipl\Stdlib\Str;
 
 class OidcController extends CompatController
 {
@@ -88,6 +89,10 @@ class OidcController extends CompatController
             throw new AuthenticationException($this->translate(
                 'Username became empty after applying search and replace'
             ));
+        }
+
+        if (is_string($groups)) {
+            $groups = array_filter(Str::trimSplit($groups));
         }
 
         if ($groups !== null) {
